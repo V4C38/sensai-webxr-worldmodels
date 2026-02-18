@@ -2,7 +2,7 @@
 
 This repository contains everything you need to get started with worldmodels in WebXR.
 
-[GIF: Hero](./assets/rm_sensai_webxr_hero.gif)
+![Hero](./assets/rm_sensai_webxr_hero.gif)
 
 ## Getting Started
 Prequisites (Node >= 20.19.0, WebXR capable Browser, HMD optional)
@@ -17,7 +17,7 @@ How to Add Your Own Splat
 - can specify collision mesh for physics and locomotion
 
 ### Gaussian Splat Animator
-[GIF: Splat animation](./assets/rm_sensai_splatanimation.gif)
+![Splat animation](./assets/rm_sensai_splatanimation.gif)
 - GPU accellerated appear / disappear effect 
 
 
@@ -44,7 +44,7 @@ How to Add Your Own Splat
 see https://elixrjs.io/
 
 ### Headset simulator
-[Screenshot: Headset Simulator](./assets/rm_sensai_headsetsimulator.png)
+![Headset Simulator](./assets/rm_sensai_headsetsimulator.png)
 How to use
 
 ### UI
@@ -61,7 +61,7 @@ see https://iwsdk.dev/concepts/locomotion/
 Note: we disabled the separate worker for locomotion for simplicity sake, if performance is lacking, you can enable it 
 
 ### Spatial Editor
-[Screenshot: Metaspatial Editor](./assets/rm_sensai_metaspatial.png)
+![Metaspatial Editor](./assets/rm_sensai_metaspatial.png)
 - disabled by default (how to add)
 - why it can make sense to have, depending on your workflow (do you add splats at runtime or is the env prebuild/configured)
 
