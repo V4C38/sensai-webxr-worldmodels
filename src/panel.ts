@@ -22,6 +22,12 @@ function configureUIMaterial(material: THREE.Material | null | undefined) {
   material.depthTest = true;
   material.depthWrite = true;
   material.depthFunc = THREE.AlwaysDepth;
+
+  // Use texture alpha for images (e.g. logo) so transparent pixels don’t show black
+  if (material instanceof THREE.MeshBasicMaterial && material.map) {
+    material.transparent = true;
+    material.alphaTest = 0.01;
+  }
 }
 
 function applyRenderOrderToObject(object3D: THREE.Object3D) {
