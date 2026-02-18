@@ -92,3 +92,8 @@ Pointer depth behavior is also handled so panel interaction remains reliable.
 - Local testing: `npm run dev`
 - Preview production build locally: `npm run build && npm run preview`
 - ***recommended deployment workflow***: deploy static build output (`dist/`) on Cloudflare.
+
+## Acknowledgements & Credits 
+This project was created as part of the SensAI Hack(https://sensaihack.com/) - Worlds in Action. 
+
+Powered by SensAI Hackademy (https://sensaihackademy.com/).
