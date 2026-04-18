@@ -4,6 +4,8 @@ import { compileUIKit } from "@iwsdk/vite-plugin-uikitml";
 import { defineConfig, type Plugin } from "vite";
 import mkcert from "vite-plugin-mkcert";
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 // Uncomment the import below and add optimizeGLTF() to the plugins array
 // when you place GLTF/GLB files in public/gltf/:
 // import { optimizeGLTF } from "@iwsdk/vite-plugin-gltf-optimizer";
@@ -39,16 +41,11 @@ function deduplicateThree(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [
-    deduplicateThree(),
-    mkcert(),
-    injectIWER({
-      device: "metaQuest3",
-      activation: "localhost",
-      verbose: true,
-    }),
-    compileUIKit({ sourceDir: "ui", outputDir: "public/ui", verbose: true }),
-  ],
+  plugins: [deduplicateThree(), mkcert(), injectIWER({
+    device: "metaQuest3",
+    activation: "localhost",
+    verbose: true,
+  }), compileUIKit({ sourceDir: "ui", outputDir: "public/ui", verbose: true }), cloudflare()],
   resolve: {
     alias: {
       three: threePkg,
