@@ -55,6 +55,7 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     splatEntity.addComponent(GaussianSplatLoader);
 
     const splatSystem = world.getSystem(GaussianSplatLoaderSystem)!;
+    splatSystem.setHostEntity(splatEntity);
 
     // Play splat animation when entering XR
     world.visibilityState.subscribe((state) => {
@@ -76,12 +77,6 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     world
       .createTransformEntity(floor)
       .addComponent(LocomotionEnvironment, { type: EnvironmentType.STATIC });
-
-    const grid = new THREE.GridHelper(100, 100, 0x444444, 0x222222);
-    grid.material.transparent = true;
-    grid.material.opacity = 0.4;
-    world.scene.add(grid);
-
 
     // ------------------------------------------------------------
     // Hologram Sphere (distance-grabbable, translate in place)

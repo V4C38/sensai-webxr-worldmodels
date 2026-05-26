@@ -1,6 +1,6 @@
 
 import { Types, createComponent, createSystem, Entity } from "@iwsdk/core";
-import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
+import { SparkRenderer, SplatMesh, SplatFileType } from "@sparkjsdev/spark";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { GaussianSplatAnimator } from "./gaussianSplatAnimator.js";
@@ -38,6 +38,24 @@ function patchHostTransformSync(object3D: THREE.Object3D): void {
   // Reapply the current Euler so future `.rotation` edits update the live ECS quaternion.
   host.quaternion.setFromEuler(host.rotation, false);
   host.__gaussianSplatTransformPatched = true;
+}
+
+function splatFileTypeFromName(fileName: string): SplatFileType {
+  const ext = fileName.split(".").pop()?.toLowerCase();
+  switch (ext) {
+    case "spz":
+      return SplatFileType.SPZ;
+    case "ply":
+      return SplatFileType.PLY;
+    case "ksplat":
+      return SplatFileType.KSPLAT;
+    case "rad":
+      return SplatFileType.RAD;
+    default:
+      throw new Error(
+        `[GaussianSplatLoader] Unsupported splat file "${fileName}". Use .spz, .ply, .ksplat, or .rad.`,
+      );
+  }
 }
 
 
@@ -78,6 +96,12 @@ export class GaussianSplatLoaderSystem extends createSystem({
   private animating = new Set<number>();
   private gltfLoader = new GLTFLoader();
   private sparkRenderer: SparkRenderer | null = null;
+  private hostEntity: Entity | null = null;
+
+  /** Entity used by UI actions such as "Load Splat". */
+  setHostEntity(entity: Entity): void {
+    this.hostEntity = entity;
+  }
 
 
   // ----------------------------------------------------------
@@ -159,16 +183,62 @@ export class GaussianSplatLoaderSystem extends createSystem({
     options?: { animate?: boolean },
   ): Promise<void> {
     const splatUrl = entity.getValue(GaussianSplatLoader, "splatUrl") as string;
-    const meshUrl = entity.getValue(GaussianSplatLoader, "meshUrl") as string;
-    const animate =
-      options?.animate ??
-      (entity.getValue(GaussianSplatLoader, "animate") as boolean);
-
     if (!splatUrl) {
       throw new Error(
         `[GaussianSplatLoader] Entity ${entity.index} has an empty splatUrl.`,
       );
     }
+
+    await this.loadSplatMesh(entity, {
+      sourceLabel: splatUrl,
+      splatMeshOptions: { url: splatUrl },
+      meshUrl: entity.getValue(GaussianSplatLoader, "meshUrl") as string,
+      animate: options?.animate,
+    });
+  }
+
+  /** Load a splat from a user-selected local file (replaces any current splat). */
+  async loadFromFile(
+    file: File,
+    options?: { animate?: boolean; entity?: Entity },
+  ): Promise<void> {
+    const entity = options?.entity ?? this.hostEntity;
+    if (!entity) {
+      throw new Error(
+        "[GaussianSplatLoader] No host entity registered for file loading.",
+      );
+    }
+
+    const fileBytes = await file.arrayBuffer();
+    await this.loadSplatMesh(entity, {
+      sourceLabel: file.name,
+      splatMeshOptions: {
+        fileBytes,
+        fileName: file.name,
+        fileType: splatFileTypeFromName(file.name),
+      },
+      meshUrl: "",
+      animate: options?.animate ?? true,
+    });
+  }
+
+  private async loadSplatMesh(
+    entity: Entity,
+    {
+      sourceLabel,
+      splatMeshOptions,
+      meshUrl,
+      animate: animateOverride,
+    }: {
+      sourceLabel: string;
+      splatMeshOptions: ConstructorParameters<typeof SplatMesh>[0];
+      meshUrl: string;
+      animate?: boolean;
+    },
+  ): Promise<void> {
+    const animate =
+      animateOverride ??
+      (entity.getValue(GaussianSplatLoader, "animate") as boolean);
 
     const parent = entity.object3D;
     if (!parent) {
@@ -195,7 +265,7 @@ export class GaussianSplatLoaderSystem extends createSystem({
     }
 
     const splat = new SplatMesh({
-      url: splatUrl,
+      ...splatMeshOptions,
       lod: enableLod || undefined,
     });
     const timeout = new Promise<never>((_, reject) => {
@@ -203,7 +273,7 @@ export class GaussianSplatLoaderSystem extends createSystem({
         () =>
           reject(
             new Error(
-              `[GaussianSplatLoader] Timed out loading "${splatUrl}" after ${LOAD_TIMEOUT_MS / 1000}s`,
+              `[GaussianSplatLoader] Timed out loading "${sourceLabel}" after ${LOAD_TIMEOUT_MS / 1000}s`,
             ),
           ),
         LOAD_TIMEOUT_MS,
@@ -234,7 +304,7 @@ export class GaussianSplatLoaderSystem extends createSystem({
 
     this.instances.set(entity.index, { splat, collider, animator });
     console.log(
-      `[GaussianSplatLoader] Loaded splat for entity ${entity.index}` +
+      `[GaussianSplatLoader] Loaded "${sourceLabel}" for entity ${entity.index}` +
         `${collider ? " (with collider)" : ""}`,
     );
 

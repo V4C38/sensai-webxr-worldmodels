@@ -9,6 +9,9 @@ import {
   UIKit,
 } from "@iwsdk/core";
 import * as THREE from "three";
+import { GaussianSplatLoaderSystem } from "./gaussianSplatLoader.js";
+
+const SPLAT_FILE_ACCEPT = ".spz,.ply,.ksplat,.rad";
 
 // Render UI on top of splats using AlwaysDepth + high renderOrder.
 // depthWrite stays true so the IWSDK laser pointer depth-tests correctly
@@ -108,12 +111,12 @@ export class PanelSystem extends createSystem({
     this.queries.sensaiPanel.subscribe("qualify", (entity) => {
       makeEntityRenderOnTop(entity);
 
-      const document = PanelDocument.data.document[
+      const panelDoc = PanelDocument.data.document[
         entity.index
       ] as UIKitDocument;
-      if (!document) return;
+      if (!panelDoc) return;
 
-      const xrButton = document.getElementById("xr-button") as UIKit.Text;
+      const xrButton = panelDoc.getElementById("xr-button") as UIKit.Text;
       xrButton.addEventListener("click", () => {
         if (this.world.visibilityState.value === VisibilityState.NonImmersive) {
           this.world.launchXR();
@@ -129,6 +132,35 @@ export class PanelSystem extends createSystem({
               ? "Enter XR"
               : "Exit to Browser",
         });
+      });
+
+      const loadSplatButton = panelDoc.getElementById(
+        "load-splat-button",
+      ) as UIKit.Text;
+      loadSplatButton.addEventListener("click", () => {
+        const input = window.document.createElement("input");
+        input.type = "file";
+        input.accept = SPLAT_FILE_ACCEPT;
+        input.addEventListener("change", async () => {
+          const file = input.files?.[0];
+          if (!file) return;
+
+          const splatSystem = this.world.getSystem(GaussianSplatLoaderSystem);
+          if (!splatSystem) {
+            console.error("[Panel] GaussianSplatLoaderSystem is not registered.");
+            return;
+          }
+
+          loadSplatButton.setProperties({ text: "Splat Loading ..." });
+          try {
+            await splatSystem.loadFromFile(file);
+          } catch (err) {
+            console.error("[Panel] Failed to load splat file:", err);
+          } finally {
+            loadSplatButton.setProperties({ text: "Load Splat" });
+          }
+        });
+        input.click();
       });
     }, true);
   }

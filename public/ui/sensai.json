@@ -48,12 +48,23 @@
         "sourceTag": "button",
         "type": "custom",
         "children": [
+          "Load Splat"
+        ],
+        "properties": {
+          "id": "load-splat-button"
+        },
+        "dataUid": "uid-6"
+      },
+      {
+        "sourceTag": "button",
+        "type": "custom",
+        "children": [
           "Enter XR"
         ],
         "properties": {
           "id": "xr-button"
         },
-        "dataUid": "uid-6"
+        "dataUid": "uid-7"
       }
     ],
     "properties": {
@@ -121,6 +132,21 @@
         "textAlign": "center",
         "cursor": "pointer"
       }
+    },
+    "__id__load-splat-button": {
+      "content": {
+        "width": "100%",
+        "padding": "1.5",
+        "marginTop": "2",
+        "borderRadius": 1.5,
+        "borderWidth": "0",
+        "fontSize": "2.5",
+        "fontWeight": "bold",
+        "textAlign": "center",
+        "cursor": "pointer",
+        "backgroundColor": "#7b2ff2",
+        "color": "#f5f3ff"
+      }
     }
   },
   "ranges": {
@@ -176,71 +202,91 @@
     },
     "__id__xr-button": {
       "start": {
-        "line": 41,
+        "line": 42,
         "column": 2
       },
       "end": {
-        "line": 41,
+        "line": 42,
         "column": 12
+      }
+    },
+    "__id__load-splat-button": {
+      "start": {
+        "line": 56,
+        "column": 2
+      },
+      "end": {
+        "line": 56,
+        "column": 20
       }
     },
     "uid-1": {
       "start": {
-        "line": 55,
+        "line": 70,
         "column": 0
       },
       "end": {
-        "line": 61,
+        "line": 77,
         "column": 6
       }
     },
     "uid-2": {
       "start": {
-        "line": 56,
+        "line": 71,
         "column": 2
       },
       "end": {
-        "line": 56,
+        "line": 71,
         "column": 49
       }
     },
     "uid-3": {
       "start": {
-        "line": 57,
+        "line": 72,
         "column": 2
       },
       "end": {
-        "line": 57,
+        "line": 72,
         "column": 51
       }
     },
     "uid-4": {
       "start": {
-        "line": 58,
+        "line": 73,
         "column": 2
       },
       "end": {
-        "line": 58,
+        "line": 73,
         "column": 29
       }
     },
     "uid-5": {
       "start": {
-        "line": 59,
+        "line": 74,
         "column": 2
       },
       "end": {
-        "line": 59,
+        "line": 74,
         "column": 46
       }
     },
     "uid-6": {
       "start": {
-        "line": 60,
+        "line": 75,
         "column": 2
       },
       "end": {
-        "line": 60,
+        "line": 75,
+        "column": 52
+      }
+    },
+    "uid-7": {
+      "start": {
+        "line": 76,
+        "column": 2
+      },
+      "end": {
+        "line": 76,
         "column": 42
       }
     }

@@ -39,6 +39,7 @@
     font-weight: medium;
   }
 
+  #load-splat-button,
   #xr-button {
     width: 100%;
     padding: 1.5;
@@ -52,11 +53,26 @@
     text-align: center;
     cursor: pointer;
   }
+
+  #load-splat-button {
+    width: 100%;
+    padding: 1.5;
+    margin-top: 2;
+    border-radius: 1.5;
+    border-width: 0;
+    font-size: 2.5;
+    font-weight: bold;
+    text-align: center;
+    cursor: pointer;
+    background-color: #7b2ff2;
+    color: #f5f3ff;
+  }
 </style>
 <div class="panel-container">
   <img src="/logo.png" alt="Logo" class="logo" />
   <span class="sub-heading">WebXR with IWSDK</span>
   <div class="divider"></div>
   <span class="event-line">Hyped+Escape</span>
+  <button id="load-splat-button">Load Splat</button>
   <button id="xr-button">Enter XR</button>
 </div>
