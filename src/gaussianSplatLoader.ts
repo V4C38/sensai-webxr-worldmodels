@@ -11,6 +11,9 @@ import { GaussianSplatAnimator } from "./gaussianSplatAnimator.js";
 // ------------------------------------------------------------
 const LOAD_TIMEOUT_MS = 30_000;
 
+/** Correct World Labs / OpenGL SPZ exports (-Y down, -Z forward) for Three.js (+Y up). */
+const SPZ_COORDINATE_FIX_X = Math.PI;
+
 interface SplatInstance {
   splat: SplatMesh;
   collider: THREE.Group | null;
@@ -47,7 +50,7 @@ function patchHostTransformSync(object3D: THREE.Object3D): void {
  * children so they inherit the entity's transform.
  */
 export const GaussianSplatLoader = createComponent("GaussianSplatLoader", {
-  splatUrl: { type: Types.String, default: "./splats/sensai.spz" },
+  splatUrl: { type: Types.String, default: "./splats/louvre.spz" },
   meshUrl: { type: Types.String, default: "" },
   autoLoad: { type: Types.Boolean, default: true },
   animate: { type: Types.Boolean, default: false },
@@ -223,6 +226,9 @@ export class GaussianSplatLoaderSystem extends createSystem({
 
     // Render splats behind UI panels (which use AlwaysDepth + high renderOrder)
     splat.renderOrder = -10;
+    splat.rotation.x = SPZ_COORDINATE_FIX_X;
+    if (collider) collider.rotation.x = SPZ_COORDINATE_FIX_X;
+
     parent.add(splat);
     if (collider) parent.add(collider);
 

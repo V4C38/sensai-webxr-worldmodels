@@ -7,8 +7,8 @@
         "type": "image",
         "sourceTag": "img",
         "properties": {
-          "src": "/SensAI-logo.png",
-          "alt": "SensAI",
+          "src": "/logo.png",
+          "alt": "Logo",
           "class": "logo"
         },
         "dataUid": "uid-2"
@@ -17,7 +17,7 @@
         "sourceTag": "span",
         "type": "custom",
         "children": [
-          "WebXR + SparkJS Template"
+          "WebXR with IWSDK"
         ],
         "properties": {
           "class": "sub-heading"
@@ -37,7 +37,7 @@
         "sourceTag": "span",
         "type": "custom",
         "children": [
-          "sensaihack.com"
+          "Hyped+Escape"
         ],
         "properties": {
           "class": "event-line"
@@ -201,7 +201,7 @@
       },
       "end": {
         "line": 56,
-        "column": 58
+        "column": 49
       }
     },
     "uid-3": {
@@ -211,7 +211,7 @@
       },
       "end": {
         "line": 57,
-        "column": 59
+        "column": 51
       }
     },
     "uid-4": {
@@ -231,7 +231,7 @@
       },
       "end": {
         "line": 59,
-        "column": 48
+        "column": 46
       }
     },
     "uid-6": {

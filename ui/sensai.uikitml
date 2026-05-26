@@ -54,9 +54,9 @@
   }
 </style>
 <div class="panel-container">
-  <img src="/SensAI-logo.png" alt="SensAI" class="logo" />
-  <span class="sub-heading">WebXR + SparkJS Template</span>
+  <img src="/logo.png" alt="Logo" class="logo" />
+  <span class="sub-heading">WebXR with IWSDK</span>
   <div class="divider"></div>
-  <span class="event-line">sensaihack.com</span>
+  <span class="event-line">Hyped+Escape</span>
   <button id="xr-button">Enter XR</button>
 </div>
