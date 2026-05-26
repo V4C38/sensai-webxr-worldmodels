@@ -86,7 +86,7 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     // ------------------------------------------------------------
     // Hologram Sphere (distance-grabbable, translate in place)
     // ------------------------------------------------------------
-    spawnHologramSphere(world);
+    // spawnHologramSphere(world);
 
 
     // ------------------------------------------------------------
