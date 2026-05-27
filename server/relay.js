@@ -2,12 +2,16 @@
 /**
  * Minimal WebSocket relay for shared splat rooms (adapted from google/xrblocks netblocks).
  * @see https://github.com/google/xrblocks/tree/main/src/addons/netblocks/server
+ *
+ * Deploy separately from the Vercel frontend (Render, Railway, Fly.io, etc.).
+ * Cloud hosts terminate TLS — listen on HTTP + WebSocket; clients use wss://your-relay-host.
  */
-import { WebSocketServer } from "ws";
+import http from "node:http";
+import https from "node:https";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import https from "node:https";
+import { WebSocketServer } from "ws";
 
 const PORT = Number(process.env.PORT ?? 8765);
 const HOST = process.env.HOST ?? "0.0.0.0";
@@ -21,26 +25,25 @@ const certFile = process.env.RELAY_CERT ?? path.join(mkcertDir, "cert.pem");
 
 const canUseTls = fs.existsSync(keyFile) && fs.existsSync(certFile);
 
-// Splat sync sends chunked RPC frames; allow headroom beyond the old 64 KiB cap.
 const maxPayload = Number(process.env.MAX_PAYLOAD ?? 16 * 1024 * 1024);
 
-let server;
-if (canUseTls) {
-  const key = fs.readFileSync(keyFile);
-  const cert = fs.readFileSync(certFile);
-  server = https.createServer({ key, cert });
-  server.listen(PORT, HOST);
-}
+const httpServer = canUseTls
+  ? https.createServer({
+      key: fs.readFileSync(keyFile),
+      cert: fs.readFileSync(certFile),
+    })
+  : http.createServer((req, res) => {
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end("sensai splat relay ok\n");
+    });
 
-const wss = canUseTls
-  ? new WebSocketServer({ server, maxPayload })
-  : new WebSocketServer({ host: HOST, port: PORT, maxPayload });
+httpServer.listen(PORT, HOST, () => {
+  console.log(
+    `[relay] listening on port ${PORT} (${canUseTls ? "local TLS" : "HTTP + WebSocket"})`,
+  );
+});
 
-console.log(
-  `[relay] listening on ${
-    canUseTls ? `wss://${HOST}:${PORT}` : `ws://${HOST}:${PORT}`
-  }`,
-);
+const wss = new WebSocketServer({ server: httpServer, maxPayload });
 
 wss.on("connection", (ws) => {
   /** @type {string | null} */

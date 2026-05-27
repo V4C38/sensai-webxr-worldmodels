@@ -27,7 +27,15 @@ export function resolveRoomId(code: string | null): string {
   return code ? `${BASE_ROOM_ID}-${code}` : BASE_ROOM_ID;
 }
 
+/**
+ * Relay WebSocket URL.
+ * - Production: set `VITE_RELAY_URL` in Vercel (e.g. `wss://your-relay.onrender.com`).
+ * - Local dev: defaults to port 8765 on the current host (`npm run relay`).
+ */
 export function getRelayUrl(): string {
+  const configured = import.meta.env.VITE_RELAY_URL?.trim();
+  if (configured) return configured;
+
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${location.hostname}:8765`;
 }
