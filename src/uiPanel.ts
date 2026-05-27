@@ -10,6 +10,10 @@ import {
 } from "@iwsdk/core";
 import * as THREE from "three";
 import { GaussianSplatLoaderSystem } from "./gaussianSplatLoader.js";
+import {
+  registerLoadSplatButton,
+  setLoadSplatButtonLoading,
+} from "./splatLoadUi.js";
 
 const SPLAT_FILE_ACCEPT = ".spz,.ply,.ksplat,.rad";
 
@@ -137,6 +141,8 @@ export class PanelSystem extends createSystem({
       const loadSplatButton = panelDoc.getElementById(
         "load-splat-button",
       ) as UIKit.Text;
+      registerLoadSplatButton(loadSplatButton);
+
       loadSplatButton.addEventListener("click", () => {
         const input = window.document.createElement("input");
         input.type = "file";
@@ -151,13 +157,14 @@ export class PanelSystem extends createSystem({
             return;
           }
 
-          loadSplatButton.setProperties({ text: "Splat Loading ..." });
+          setLoadSplatButtonLoading(true);
           try {
+            await splatSystem.unloadHostSplat();
             await splatSystem.loadFromFile(file);
           } catch (err) {
             console.error("[Panel] Failed to load splat file:", err);
           } finally {
-            loadSplatButton.setProperties({ text: "Load Splat" });
+            setLoadSplatButtonLoading(false);
           }
         });
         input.click();
