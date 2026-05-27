@@ -14,6 +14,7 @@ import {
   registerLoadSplatButton,
   setLoadSplatButtonLoading,
 } from "./splatLoadUi.js";
+import { enterXR } from "./xrSession.js";
 
 const SPLAT_FILE_ACCEPT = ".spz,.ply,.ksplat,.rad";
 
@@ -123,7 +124,9 @@ export class PanelSystem extends createSystem({
       const xrButton = panelDoc.getElementById("xr-button") as UIKit.Text;
       xrButton.addEventListener("click", () => {
         if (this.world.visibilityState.value === VisibilityState.NonImmersive) {
-          this.world.launchXR();
+          enterXR(this.world).catch((err) => {
+            console.error("[Panel] Failed to enter XR:", err);
+          });
         } else {
           this.world.exitXR();
         }

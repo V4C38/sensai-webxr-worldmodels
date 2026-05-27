@@ -119,6 +119,8 @@ export class GaussianSplatLoaderSystem extends createSystem({
   private hostEntity: Entity | null = null;
   private onSplatLoaded: SplatLoadedHandler | null = null;
   private syncedState: SplatSyncState | null = null;
+  /** Bumped on each load to cancel in-flight loads that would otherwise stack splats. */
+  private loadEpoch = 0;
 
   /** Entity used by UI actions such as "Load Splat". */
   setHostEntity(entity: Entity): void {
@@ -133,10 +135,37 @@ export class GaussianSplatLoaderSystem extends createSystem({
     return this.hostEntity !== null && this.instances.has(this.hostEntity.index);
   }
 
-  /** Unload the splat on the host entity (no-op if none loaded). */
+  /** Cancel in-flight loads so a superseded transfer cannot add another splat. */
+  bumpLoadEpoch(): void {
+    this.loadEpoch += 1;
+  }
+
+  /** Unload every splat on the host entity, including orphaned meshes. */
   async unloadHostSplat(): Promise<void> {
-    if (!this.hostEntity || !this.instances.has(this.hostEntity.index)) return;
-    await this.unload(this.hostEntity, { animate: false });
+    if (!this.hostEntity) return;
+    this.bumpLoadEpoch();
+    await this.clearHostSplats(this.hostEntity);
+  }
+
+  /** Remove tracked and untracked SplatMesh children from an entity. */
+  async clearHostSplats(entity: Entity): Promise<void> {
+    const parent = entity.object3D;
+    if (!parent) return;
+
+    if (this.instances.has(entity.index)) {
+      await this.unload(entity, { animate: false });
+    }
+
+    const orphans: SplatMesh[] = [];
+    for (const child of parent.children) {
+      if (child instanceof SplatMesh) {
+        orphans.push(child);
+      }
+    }
+    for (const splat of orphans) {
+      parent.remove(splat);
+      splat.dispose();
+    }
   }
 
   setOnSplatLoaded(handler: SplatLoadedHandler | null): void {
@@ -363,9 +392,8 @@ export class GaussianSplatLoaderSystem extends createSystem({
       );
     }
 
-    if (this.instances.has(entity.index)) {
-      await this.unload(entity, { animate: false });
-    }
+    const epoch = ++this.loadEpoch;
+    await this.clearHostSplats(entity);
 
     const enableLod = entity.getValue(
       GaussianSplatLoader,
@@ -397,6 +425,11 @@ export class GaussianSplatLoaderSystem extends createSystem({
     });
     await Promise.race([splat.initialized, timeout]);
 
+    if (epoch !== this.loadEpoch) {
+      splat.dispose();
+      return;
+    }
+
     let collider: THREE.Group | null = null;
     if (meshUrl) {
       const gltf = await this.gltfLoader.loadAsync(meshUrl);
@@ -414,6 +447,23 @@ export class GaussianSplatLoaderSystem extends createSystem({
     splat.renderOrder = -10;
     splat.rotation.x = SPZ_COORDINATE_FIX_X;
     if (collider) collider.rotation.x = SPZ_COORDINATE_FIX_X;
+
+    if (epoch !== this.loadEpoch) {
+      splat.dispose();
+      if (collider) {
+        collider.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            mesh.geometry.dispose();
+            const materials = Array.isArray(mesh.material)
+              ? mesh.material
+              : [mesh.material];
+            for (const mat of materials) mat.dispose();
+          }
+        });
+      }
+      return;
+    }
 
     parent.add(splat);
     if (collider) parent.add(collider);

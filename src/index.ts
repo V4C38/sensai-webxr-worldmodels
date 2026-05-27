@@ -27,8 +27,10 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   assets: {},
   xr: {
     sessionMode: SessionMode.ImmersiveVR,
-    offer: "always",
-    features: { handTracking: true, layers: true },
+    // Avoid auto-offer; Enter XR uses enterXR() with runtime fallbacks.
+    offer: "none",
+    // layers / hand-tracking break some desktop + Virtual Desktop runtimes.
+    features: { handTracking: false, layers: false },
   },
   render: {
     defaultLighting: false,
