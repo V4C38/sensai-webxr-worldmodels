@@ -15,7 +15,9 @@ import {
 } from "@iwsdk/core";
 import { PanelSystem } from "./uiPanel.js";
 import { GaussianSplatLoader, GaussianSplatLoaderSystem,} from "./gaussianSplatLoader.js";
-import { spawnHologramSphere } from "./interactableExample.js";
+import { mountRoomHud, MultiplayerSystem } from "./multiplayerSystem.js";
+
+mountRoomHud();
 
 
 // ------------------------------------------------------------
@@ -25,8 +27,10 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   assets: {},
   xr: {
     sessionMode: SessionMode.ImmersiveVR,
-    offer: "always",
-    features: { handTracking: true, layers: true },
+    // Avoid auto-offer; Enter XR uses enterXR() with runtime fallbacks.
+    offer: "none",
+    // layers / hand-tracking break some desktop + Virtual Desktop runtimes.
+    features: { handTracking: false, layers: false },
   },
   render: {
     defaultLighting: false,
@@ -45,7 +49,8 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
 
     world
       .registerSystem(PanelSystem)
-      .registerSystem(GaussianSplatLoaderSystem);
+      .registerSystem(GaussianSplatLoaderSystem)
+      .registerSystem(MultiplayerSystem);
 
 
     // ------------------------------------------------------------
@@ -74,9 +79,13 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     floorGeometry.rotateX(-Math.PI / 2);
     const floor = new Mesh(floorGeometry, new MeshBasicMaterial());
     floor.visible = false;
-    world
-      .createTransformEntity(floor)
-      .addComponent(LocomotionEnvironment, { type: EnvironmentType.STATIC });
+    const floorEntity = world.createTransformEntity(floor);
+    // Locomotion system can initialize a tick later on startup.
+    requestAnimationFrame(() => {
+      floorEntity.addComponent(LocomotionEnvironment, {
+        type: EnvironmentType.STATIC,
+      });
+    });
 
     // ------------------------------------------------------------
     // Hologram Sphere (distance-grabbable, translate in place)

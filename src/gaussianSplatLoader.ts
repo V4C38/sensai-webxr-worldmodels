@@ -4,21 +4,41 @@ import { SparkRenderer, SplatMesh, SplatFileType } from "@sparkjsdev/spark";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { GaussianSplatAnimator } from "./gaussianSplatAnimator.js";
+import { bytesToBase64 } from "./net/bytes.js";
+import type { SplatSyncState } from "./net/roomSession.js";
 
 
 // ------------------------------------------------------------
 // Constants & Types
 // ------------------------------------------------------------
-const LOAD_TIMEOUT_MS = 30_000;
+const LOAD_TIMEOUT_MS = 120_000;
 
 /** Correct World Labs / OpenGL SPZ exports (-Y down, -Z forward) for Three.js (+Y up). */
 const SPZ_COORDINATE_FIX_X = Math.PI;
+
+type SplatMeshLoadOptions = NonNullable<
+  ConstructorParameters<typeof SplatMesh>[0]
+>;
 
 interface SplatInstance {
   splat: SplatMesh;
   collider: THREE.Group | null;
   animator: GaussianSplatAnimator | null;
 }
+
+export type SplatLoadedInfo =
+  | { kind: "url"; splatUrl: string; label: string }
+  | {
+      kind: "file";
+      fileName: string;
+      fileType: SplatFileType;
+      fileBytes: ArrayBuffer;
+    };
+
+export type SplatLoadedHandler = (
+  info: SplatLoadedInfo,
+  options: { sync: boolean },
+) => void | Promise<void>;
 
 type SplatHostObject3D = THREE.Object3D & {
   __gaussianSplatTransformPatched?: boolean;
@@ -97,10 +117,63 @@ export class GaussianSplatLoaderSystem extends createSystem({
   private gltfLoader = new GLTFLoader();
   private sparkRenderer: SparkRenderer | null = null;
   private hostEntity: Entity | null = null;
+  private onSplatLoaded: SplatLoadedHandler | null = null;
+  private syncedState: SplatSyncState | null = null;
+  /** Bumped on each load to cancel in-flight loads that would otherwise stack splats. */
+  private loadEpoch = 0;
 
   /** Entity used by UI actions such as "Load Splat". */
   setHostEntity(entity: Entity): void {
     this.hostEntity = entity;
+  }
+
+  getHostEntity(): Entity | null {
+    return this.hostEntity;
+  }
+
+  hasHostSplat(): boolean {
+    return this.hostEntity !== null && this.instances.has(this.hostEntity.index);
+  }
+
+  /** Cancel in-flight loads so a superseded transfer cannot add another splat. */
+  bumpLoadEpoch(): void {
+    this.loadEpoch += 1;
+  }
+
+  /** Unload every splat on the host entity, including orphaned meshes. */
+  async unloadHostSplat(): Promise<void> {
+    if (!this.hostEntity) return;
+    this.bumpLoadEpoch();
+    await this.clearHostSplats(this.hostEntity);
+  }
+
+  /** Remove tracked and untracked SplatMesh children from an entity. */
+  async clearHostSplats(entity: Entity): Promise<void> {
+    const parent = entity.object3D;
+    if (!parent) return;
+
+    if (this.instances.has(entity.index)) {
+      await this.unload(entity, { animate: false });
+    }
+
+    const orphans: SplatMesh[] = [];
+    for (const child of parent.children) {
+      if (child instanceof SplatMesh) {
+        orphans.push(child);
+      }
+    }
+    for (const splat of orphans) {
+      parent.remove(splat);
+      splat.dispose();
+    }
+  }
+
+  setOnSplatLoaded(handler: SplatLoadedHandler | null): void {
+    this.onSplatLoaded = handler;
+  }
+
+  getSyncedState(): SplatSyncState | null {
+    return this.syncedState;
   }
 
 
@@ -145,7 +218,9 @@ export class GaussianSplatLoaderSystem extends createSystem({
       ) as boolean;
       if (!autoLoad) return;
 
-      this.load(entity).catch((err) => {
+      // Auto-loaded splats should also synchronize into the room so guests
+      // see the current world model as soon as they join.
+      this.load(entity, { sync: true }).catch((err) => {
         console.error(
           `[GaussianSplatLoader] Auto-load failed for entity ${entity.index}:`,
           err,
@@ -180,7 +255,7 @@ export class GaussianSplatLoaderSystem extends createSystem({
   // ----------------------------------------------------------
   async load(
     entity: Entity,
-    options?: { animate?: boolean },
+    options?: { animate?: boolean; sync?: boolean },
   ): Promise<void> {
     const splatUrl = entity.getValue(GaussianSplatLoader, "splatUrl") as string;
     if (!splatUrl) {
@@ -194,13 +269,14 @@ export class GaussianSplatLoaderSystem extends createSystem({
       splatMeshOptions: { url: splatUrl },
       meshUrl: entity.getValue(GaussianSplatLoader, "meshUrl") as string,
       animate: options?.animate,
+      sync: options?.sync ?? false,
     });
   }
 
   /** Load a splat from a user-selected local file (replaces any current splat). */
   async loadFromFile(
     file: File,
-    options?: { animate?: boolean; entity?: Entity },
+    options?: { animate?: boolean; entity?: Entity; sync?: boolean },
   ): Promise<void> {
     const entity = options?.entity ?? this.hostEntity;
     if (!entity) {
@@ -219,6 +295,69 @@ export class GaussianSplatLoaderSystem extends createSystem({
       },
       meshUrl: "",
       animate: options?.animate ?? true,
+      sync: options?.sync ?? true,
+      loadedInfo: {
+        kind: "file",
+        fileName: file.name,
+        fileType: splatFileTypeFromName(file.name),
+        fileBytes,
+      },
+    });
+  }
+
+  /** Load a splat received from another peer in the shared room. */
+  async loadFromNetwork(
+    payload:
+      | { kind: "url"; splatUrl: string; label: string }
+      | {
+          kind: "file";
+          fileName: string;
+          fileType: SplatFileType;
+          fileBytes: ArrayBuffer;
+        },
+    options?: { animate?: boolean },
+  ): Promise<void> {
+    const entity = this.hostEntity;
+    if (!entity) {
+      throw new Error(
+        "[GaussianSplatLoader] No host entity registered for network loading.",
+      );
+    }
+
+    if (payload.kind === "url") {
+      await this.loadSplatMesh(entity, {
+        sourceLabel: payload.label,
+        splatMeshOptions: { url: payload.splatUrl },
+        meshUrl: "",
+        animate: options?.animate ?? true,
+        sync: false,
+        fromNetwork: true,
+        loadedInfo: {
+          kind: "url",
+          splatUrl: payload.splatUrl,
+          label: payload.label,
+        },
+      });
+      return;
+    }
+
+    await this.loadSplatMesh(entity, {
+      sourceLabel: payload.fileName,
+      splatMeshOptions: {
+        fileBytes: payload.fileBytes,
+        fileName: payload.fileName,
+        fileType: payload.fileType,
+      },
+      meshUrl: "",
+      animate: options?.animate ?? true,
+      sync: false,
+      fromNetwork: true,
+      loadedInfo: {
+        kind: "file",
+        fileName: payload.fileName,
+        fileType: payload.fileType,
+        fileBytes: payload.fileBytes,
+      },
     });
   }
 
@@ -229,11 +368,17 @@ export class GaussianSplatLoaderSystem extends createSystem({
       splatMeshOptions,
       meshUrl,
       animate: animateOverride,
+      sync = false,
+      fromNetwork = false,
+      loadedInfo,
     }: {
       sourceLabel: string;
-      splatMeshOptions: ConstructorParameters<typeof SplatMesh>[0];
+      splatMeshOptions: SplatMeshLoadOptions;
       meshUrl: string;
       animate?: boolean;
+      sync?: boolean;
+      fromNetwork?: boolean;
+      loadedInfo?: SplatLoadedInfo;
     },
   ): Promise<void> {
     const animate =
@@ -247,9 +392,8 @@ export class GaussianSplatLoaderSystem extends createSystem({
       );
     }
 
-    if (this.instances.has(entity.index)) {
-      await this.unload(entity, { animate: false });
-    }
+    const epoch = ++this.loadEpoch;
+    await this.clearHostSplats(entity);
 
     const enableLod = entity.getValue(
       GaussianSplatLoader,
@@ -281,6 +425,11 @@ export class GaussianSplatLoaderSystem extends createSystem({
     });
     await Promise.race([splat.initialized, timeout]);
 
+    if (epoch !== this.loadEpoch) {
+      splat.dispose();
+      return;
+    }
+
     let collider: THREE.Group | null = null;
     if (meshUrl) {
       const gltf = await this.gltfLoader.loadAsync(meshUrl);
@@ -299,6 +448,23 @@ export class GaussianSplatLoaderSystem extends createSystem({
     splat.rotation.x = SPZ_COORDINATE_FIX_X;
     if (collider) collider.rotation.x = SPZ_COORDINATE_FIX_X;
 
+    if (epoch !== this.loadEpoch) {
+      splat.dispose();
+      if (collider) {
+        collider.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            mesh.geometry.dispose();
+            const materials = Array.isArray(mesh.material)
+              ? mesh.material
+              : [mesh.material];
+            for (const mat of materials) mat.dispose();
+          }
+        });
+      }
+      return;
+    }
+
     parent.add(splat);
     if (collider) parent.add(collider);
 
@@ -311,6 +477,37 @@ export class GaussianSplatLoaderSystem extends createSystem({
     if (animate) {
       this.animating.add(entity.index);
       await animator.animateIn();
+    }
+
+    const info: SplatLoadedInfo =
+      loadedInfo ??
+      (splatMeshOptions.url
+        ? {
+            kind: "url",
+            splatUrl: String(splatMeshOptions.url),
+            label: sourceLabel,
+          }
+        : {
+            kind: "file",
+            fileName: String(splatMeshOptions.fileName ?? sourceLabel),
+            fileType:
+              splatMeshOptions.fileType ??
+              splatFileTypeFromName(String(splatMeshOptions.fileName ?? "")),
+            fileBytes: (splatMeshOptions.fileBytes as ArrayBuffer) ?? new ArrayBuffer(0),
+          });
+
+    this.syncedState =
+      info.kind === "url"
+        ? { kind: "url", splatUrl: info.splatUrl, label: info.label }
+        : {
+            kind: "file",
+            fileName: info.fileName,
+            fileType: info.fileType,
+            base64: bytesToBase64(new Uint8Array(info.fileBytes)),
+          };
+
+    if (!fromNetwork && this.onSplatLoaded) {
+      await this.onSplatLoaded(info, { sync });
     }
   }
 

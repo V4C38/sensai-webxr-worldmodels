@@ -1,0 +1,15 @@
+# Deploy the splat relay (WebSocket) on Render — separate from the Vercel frontend.
+# Dashboard: New → Blueprint → connect this repo, or create a Web Service manually.
+services:
+  - type: web
+    name: sensai-splat-relay
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server/relay.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: MAX_PAYLOAD
+        value: "16777216"
