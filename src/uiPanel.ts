@@ -14,6 +14,7 @@ import {
   registerLoadSplatButton,
   setLoadSplatButtonLoading,
 } from "./splatLoadUi.js";
+import { registerDesktopUiPanel } from "./desktopControls.js";
 import { enterXR } from "./xrSession.js";
 
 const SPLAT_FILE_ACCEPT = ".spz,.ply,.ksplat,.rad";
@@ -90,6 +91,7 @@ export function makeEntityRenderOnTop(entity: Entity): void {
   const tryApply = () => {
     if (entity.object3D) {
       applyRenderOrderToObject(entity.object3D);
+      registerDesktopUiPanel(entity.object3D);
       return;
     }
     if (++attempts < 10) {

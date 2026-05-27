@@ -13,10 +13,10 @@ import {
   VisibilityState,
   World,
 } from "@iwsdk/core";
+import { DesktopControlsSystem } from "./desktopControls.js";
 import { PanelSystem } from "./uiPanel.js";
 import { GaussianSplatLoader, GaussianSplatLoaderSystem,} from "./gaussianSplatLoader.js";
 import { mountRoomHud, MultiplayerSystem } from "./multiplayerSystem.js";
-
 mountRoomHud();
 
 
@@ -50,8 +50,8 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     world
       .registerSystem(PanelSystem)
       .registerSystem(GaussianSplatLoaderSystem)
-      .registerSystem(MultiplayerSystem);
-
+      .registerSystem(MultiplayerSystem)
+      .registerSystem(DesktopControlsSystem);
 
     // ------------------------------------------------------------
     // Gaussian Splat
@@ -94,23 +94,22 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
 
 
     // ------------------------------------------------------------
-    // Panel UI (centered on screen in desktop, positioned in 3D for XR)
+    // Panel UI (top-right on desktop, world-space in XR)
     // ------------------------------------------------------------
     const panelEntity = world
       .createTransformEntity()
       .addComponent(PanelUI, {
         config: "./ui/sensai.json",
-        maxHeight: 0.8,
-        maxWidth: 1.6,
+        maxHeight: 0.45,
+        maxWidth: 0.35,
       })
       .addComponent(Interactable)
       .addComponent(ScreenSpace, {
-        top: "30%",
-        bottom: "30%",
-        left: "30%",
-        right: "30%",
-        height: "40%",
-        width: "40%",
+        top: "12px",
+        right: "12px",
+        width: "220px",
+        height: "auto",
+        zOffset: 0.25,
       });
     panelEntity.object3D!.position.set(0, 1.29, -1.9);
 

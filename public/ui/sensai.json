@@ -76,43 +76,43 @@
     "panel-container": {
       "content": {
         "alignItems": "center",
-        "padding": "3",
-        "width": "50",
+        "padding": "2",
+        "width": "28",
         "display": "flex",
         "flexDirection": "column",
         "backgroundColor": "#0d0221",
         "borderColor": "#7b2ff2",
-        "borderWidth": "0.2",
-        "borderRadius": 2
+        "borderWidth": "0.15",
+        "borderRadius": 1.2
       }
     },
     "logo": {
       "content": {
-        "width": "45",
-        "height": "12",
+        "width": "24",
+        "height": "7",
         "objectFit": "contain"
       }
     },
     "sub-heading": {
       "content": {
-        "fontSize": "1.8",
+        "fontSize": "1.2",
         "color": "#c4b5fd",
         "textAlign": "center",
-        "marginTop": "0.5"
+        "marginTop": "0.3"
       }
     },
     "divider": {
       "content": {
         "width": "80%",
-        "height": "0.1",
-        "marginTop": "1.5",
-        "marginBottom": "1.5",
+        "height": "0.08",
+        "marginTop": "0.8",
+        "marginBottom": "0.8",
         "backgroundColor": "#7b2ff2"
       }
     },
     "event-line": {
       "content": {
-        "fontSize": "1.6",
+        "fontSize": "2",
         "color": "#fbbf24",
         "textAlign": "center",
         "fontWeight": "medium"
@@ -121,29 +121,23 @@
     "__id__xr-button": {
       "content": {
         "width": "100%",
-        "padding": "1.5",
-        "marginTop": "2",
-        "backgroundColor": "#fbbf24",
-        "color": "#0d0221",
-        "borderRadius": 1.5,
+        "padding": "0.8",
+        "marginTop": "0.8",
+        "borderRadius": 0.8,
         "borderWidth": "0",
-        "fontSize": "2.5",
+        "fontSize": "1.4",
         "fontWeight": "bold",
         "textAlign": "center",
-        "cursor": "pointer"
+        "cursor": "pointer",
+        "backgroundColor": "#fbbf24",
+        "color": "#0d0221"
       }
     },
     "__id__load-splat-button": {
       "content": {
-        "width": "100%",
-        "padding": "1.5",
-        "marginTop": "2",
-        "borderRadius": 1.5,
-        "borderWidth": "0",
-        "fontSize": "2.5",
+        "fontSize": "2",
         "fontWeight": "bold",
         "textAlign": "center",
-        "cursor": "pointer",
         "backgroundColor": "#7b2ff2",
         "color": "#f5f3ff"
       }
@@ -202,91 +196,91 @@
     },
     "__id__xr-button": {
       "start": {
-        "line": 42,
+        "line": 62,
         "column": 2
       },
       "end": {
-        "line": 42,
+        "line": 62,
         "column": 12
       }
     },
     "__id__load-splat-button": {
       "start": {
-        "line": 56,
+        "line": 54,
         "column": 2
       },
       "end": {
-        "line": 56,
+        "line": 54,
         "column": 20
       }
     },
     "uid-1": {
       "start": {
-        "line": 70,
+        "line": 67,
         "column": 0
       },
       "end": {
-        "line": 77,
+        "line": 74,
         "column": 6
       }
     },
     "uid-2": {
       "start": {
-        "line": 71,
+        "line": 68,
         "column": 2
       },
       "end": {
-        "line": 71,
+        "line": 68,
         "column": 49
       }
     },
     "uid-3": {
       "start": {
-        "line": 72,
+        "line": 69,
         "column": 2
       },
       "end": {
-        "line": 72,
+        "line": 69,
         "column": 51
       }
     },
     "uid-4": {
       "start": {
-        "line": 73,
+        "line": 70,
         "column": 2
       },
       "end": {
-        "line": 73,
+        "line": 70,
         "column": 29
       }
     },
     "uid-5": {
       "start": {
-        "line": 74,
+        "line": 71,
         "column": 2
       },
       "end": {
-        "line": 74,
+        "line": 71,
         "column": 46
       }
     },
     "uid-6": {
       "start": {
-        "line": 75,
+        "line": 72,
         "column": 2
       },
       "end": {
-        "line": 75,
+        "line": 72,
         "column": 52
       }
     },
     "uid-7": {
       "start": {
-        "line": 76,
+        "line": 73,
         "column": 2
       },
       "end": {
-        "line": 76,
+        "line": 73,
         "column": 42
       }
     }

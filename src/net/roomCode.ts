@@ -56,6 +56,7 @@ export function buildRoomCodeHud(currentCode: string | null): void {
   if (typeof document === "undefined") return;
 
   const root = document.createElement("div");
+  root.id = "room-hud";
   Object.assign(root.style, {
     position: "fixed",
     top: "12px",
