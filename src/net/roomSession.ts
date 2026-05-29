@@ -7,6 +7,8 @@ import {
   RpcHandler,
   WebSocketTransport,
 } from "./transport.js";
+import { VOICE_SIGNAL_TOPIC, type VoiceSignalPayload } from "./types.js";
+import { VoiceChat } from "./voiceChat.js";
 
 export interface SplatUrlPayload {
   kind: "url";
@@ -62,8 +64,10 @@ interface WireMessage {
 
 export class RoomSession {
   readonly transport: RoomTransport;
+  readonly voice: VoiceChat;
   private _handlers = new Map<string, Set<RpcHandler>>();
   private _peerCount = 1;
+  private _remotePeers = new Set<string>();
   private _currentState: SplatSyncState | null = null;
   private _incomingFiles = new Map<
     string,
@@ -74,6 +78,15 @@ export class RoomSession {
 
   private constructor(transport: RoomTransport) {
     this.transport = transport;
+    this.voice = new VoiceChat((toPeerId, signal) => {
+      this.emitTo(toPeerId, VOICE_SIGNAL_TOPIC, signal);
+    });
+    this.voice.setLocalPeerId(transport.localPeerId);
+
+    this.on(VOICE_SIGNAL_TOPIC, (payload, fromPeerId) => {
+      void this.voice.handleSignal(fromPeerId, payload as VoiceSignalPayload);
+    });
+
     transport.onMessage((from, data) => {
       try {
         const text = new TextDecoder().decode(data);
@@ -86,16 +99,20 @@ export class RoomSession {
     });
 
     transport.onPeerJoin((peerId) => {
+      this._remotePeers.add(peerId);
       this._peerCount += 1;
       this._emitPeerCount();
+      this.voice.notifyPeerJoined(peerId);
       if (this._currentState) {
         this.syncCurrentStateToPeer(peerId);
       }
     });
 
-    transport.onPeerLeave(() => {
+    transport.onPeerLeave((peerId) => {
+      this._remotePeers.delete(peerId);
       this._peerCount = Math.max(1, this._peerCount - 1);
       this._emitPeerCount();
+      this.voice.notifyPeerLeft(peerId);
     });
   }
 
@@ -106,6 +123,14 @@ export class RoomSession {
 
   get peerCount(): number {
     return this._peerCount;
+  }
+
+  get localPeerId(): string {
+    return this.transport.localPeerId;
+  }
+
+  get remotePeerIds(): ReadonlySet<string> {
+    return this._remotePeers;
   }
 
   get currentState(): SplatSyncState | null {

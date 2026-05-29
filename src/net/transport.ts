@@ -53,9 +53,11 @@ export class BroadcastChannelTransport implements RoomTransport {
       const msg = event.data as {
         type?: string;
         from?: string;
+        to?: string;
         data?: string;
       };
       if (!msg?.type || !msg.from || msg.from === this._localPeerId) return;
+      if (msg.to && msg.to !== this._localPeerId) return;
 
       if (msg.type === "hello") {
         if (!this._peers.has(msg.from)) {
@@ -91,10 +93,10 @@ export class BroadcastChannelTransport implements RoomTransport {
 
   send(payload: Uint8Array, targetPeerId?: string): void {
     if (!this._isOpen || !this._channel) return;
-    if (targetPeerId) return;
     this._channel.postMessage({
       type: "message",
       from: this._localPeerId,
+      to: targetPeerId,
       data: bytesToBase64(payload),
     });
   }

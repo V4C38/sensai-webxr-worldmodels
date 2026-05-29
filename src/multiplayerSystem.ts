@@ -13,6 +13,7 @@ import {
   RoomSession,
   SplatSyncState,
 } from "./net/roomSession.js";
+import { mountChatHud } from "./net/chatHud.js";
 import { setLoadSplatButtonLoading } from "./splatLoadUi.js";
 
 /**
@@ -21,6 +22,7 @@ import { setLoadSplatButtonLoading } from "./splatLoadUi.js";
  */
 export class MultiplayerSystem extends createSystem({}) {
   private session: RoomSession | null = null;
+  private voiceOn = false;
 
   get isConnected(): boolean {
     return this.session?.transport.isOpen ?? false;
@@ -54,6 +56,11 @@ export class MultiplayerSystem extends createSystem({}) {
       this.session.onPeerCountChange((count) => {
         const hud = document.getElementById("room-hud-peer-count");
         if (hud) hud.textContent = `Peers: ${count}`;
+      });
+
+      const chat = mountChatHud(this.session);
+      chat.voiceButton.addEventListener("click", () => {
+        void this.toggleVoice(chat);
       });
     } catch (err) {
       console.error("[Multiplayer] Failed to join room:", err);
@@ -98,6 +105,30 @@ export class MultiplayerSystem extends createSystem({}) {
     const splatSystem = this.world.getSystem(GaussianSplatLoaderSystem);
     if (!splatSystem) return;
     await splatSystem.unloadHostSplat();
+  }
+
+  private async toggleVoice(chat: ReturnType<typeof mountChatHud>): Promise<void> {
+    const session = this.session;
+    if (!session) return;
+
+    if (this.voiceOn) {
+      session.voice.disable();
+      this.voiceOn = false;
+      chat.voiceButton.textContent = "Enable voice";
+      chat.appendSystemLine("Voice chat off");
+      return;
+    }
+
+    try {
+      await session.voice.enable(session.remotePeerIds);
+      this.voiceOn = true;
+      chat.voiceButton.textContent = "Disable voice";
+      chat.appendSystemLine("Voice chat on");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      chat.appendSystemLine(`Voice error: ${msg}`);
+      console.error("[Multiplayer] Voice enable failed:", err);
+    }
   }
 
   private async applyRemoteSplat(state: SplatSyncState): Promise<void> {
