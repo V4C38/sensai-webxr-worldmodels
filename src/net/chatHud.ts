@@ -1,3 +1,5 @@
+import { peerColorHex } from "./avatarPalette.js";
+import { getOrCreateDisplayName } from "./displayName.js";
 import type { RoomSession } from "./roomSession.js";
 import {
   CHAT_TOPIC,
@@ -6,27 +8,8 @@ import {
   DISPLAY_NAME_TOPIC,
 } from "./types.js";
 
-const AVATAR_PALETTE = [
-  0x9177c7, 0x7ac0ff, 0xffb86b, 0x7be3a4, 0xff7eb6, 0x6ee7b7, 0xf472b6,
-];
-
-function hashStringToIndex(s: string, n: number): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h) % n;
-}
-
-function peerColorHex(peerId: string): string {
-  const c = AVATAR_PALETTE[hashStringToIndex(peerId, AVATAR_PALETTE.length)]!;
-  return `#${c.toString(16).padStart(6, "0")}`;
-}
-
 function makeDisplayName(): string {
-  const stored = sessionStorage.getItem("sensai-display-name");
-  if (stored?.trim()) return stored.trim();
-  const name = `User-${Math.floor(Math.random() * 1000)}`;
-  sessionStorage.setItem("sensai-display-name", name);
-  return name;
+  return getOrCreateDisplayName();
 }
 
 export interface ChatHudHandle {

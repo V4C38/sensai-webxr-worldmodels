@@ -14,6 +14,7 @@ import {
   SplatSyncState,
 } from "./net/roomSession.js";
 import { mountChatHud } from "./net/chatHud.js";
+import { PeerPresence } from "./peerPresence.js";
 import { setLoadSplatButtonLoading } from "./splatLoadUi.js";
 
 /**
@@ -22,7 +23,9 @@ import { setLoadSplatButtonLoading } from "./splatLoadUi.js";
  */
 export class MultiplayerSystem extends createSystem({}) {
   private session: RoomSession | null = null;
+  private presence: PeerPresence | null = null;
   private voiceOn = false;
+  private lastFrameTime = performance.now();
 
   get isConnected(): boolean {
     return this.session?.transport.isOpen ?? false;
@@ -62,9 +65,19 @@ export class MultiplayerSystem extends createSystem({}) {
       chat.voiceButton.addEventListener("click", () => {
         void this.toggleVoice(chat);
       });
+
+      this.presence = new PeerPresence(this.world, this.session);
     } catch (err) {
       console.error("[Multiplayer] Failed to join room:", err);
     }
+  }
+
+  update() {
+    if (!this.presence) return;
+    const now = performance.now();
+    const dt = Math.min((now - this.lastFrameTime) / 1000, 0.05);
+    this.lastFrameTime = now;
+    this.presence.update(dt);
   }
 
   private async handleLocalSplatLoaded(

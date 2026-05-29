@@ -50,8 +50,8 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     world
       .registerSystem(PanelSystem)
       .registerSystem(GaussianSplatLoaderSystem)
-      .registerSystem(MultiplayerSystem)
-      .registerSystem(DesktopControlsSystem);
+      .registerSystem(DesktopControlsSystem)
+      .registerSystem(MultiplayerSystem);
 
     // ------------------------------------------------------------
     // Gaussian Splat
