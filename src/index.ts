@@ -44,7 +44,7 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
 })
   .then((world) => {
     world.camera.position.set(0, 1.5, 0);
-    world.scene.background = new THREE.Color(0x000000);
+    world.scene.background = new THREE.Color(0xffffff);
     world.scene.add(new THREE.AmbientLight(0xffffff, 1.0));
 
     world
