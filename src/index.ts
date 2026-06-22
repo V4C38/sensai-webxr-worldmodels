@@ -17,7 +17,9 @@ import { DesktopControlsSystem } from "./desktopControls.js";
 import { PanelSystem } from "./uiPanel.js";
 import { GaussianSplatLoader, GaussianSplatLoaderSystem,} from "./gaussianSplatLoader.js";
 import { mountRoomHud, MultiplayerSystem } from "./multiplayerSystem.js";
+import { mountMuseXrHud } from "./museXrHud.js";
 mountRoomHud();
+mountMuseXrHud();
 
 
 // ------------------------------------------------------------
