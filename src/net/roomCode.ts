@@ -60,7 +60,7 @@ export function buildRoomCodeHud(currentCode: string | null): void {
   Object.assign(root.style, {
     position: "fixed",
     top: "12px",
-    left: "12px",
+    right: "12px",
     padding: "12px 14px",
     background: "rgba(20,20,30,0.85)",
     color: "#eee",

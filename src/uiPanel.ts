@@ -138,7 +138,7 @@ export class PanelSystem extends createSystem({
         xrButton.setProperties({
           text:
             visibilityState === VisibilityState.NonImmersive
-              ? "Enter XR"
+              ? "Enter VR"
               : "Exit to Browser",
         });
       });

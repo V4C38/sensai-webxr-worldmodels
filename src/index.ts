@@ -2,20 +2,17 @@
 import * as THREE from "three";
 import {
   EnvironmentType,
-  Interactable,
   LocomotionEnvironment,
   Mesh,
   MeshBasicMaterial,
-  PanelUI,
   PlaneGeometry,
-  ScreenSpace,
   SessionMode,
   VisibilityState,
   World,
 } from "@iwsdk/core";
 import { DesktopControlsSystem } from "./desktopControls.js";
-import { PanelSystem } from "./uiPanel.js";
 import { GaussianSplatLoader, GaussianSplatLoaderSystem,} from "./gaussianSplatLoader.js";
+import { mountLoadSplatHud } from "./loadSplatHud.js";
 import { mountRoomHud, MultiplayerSystem } from "./multiplayerSystem.js";
 import { mountMuseXrHud } from "./museXrHud.js";
 mountRoomHud();
@@ -50,10 +47,11 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     world.scene.add(new THREE.AmbientLight(0xffffff, 1.0));
 
     world
-      .registerSystem(PanelSystem)
       .registerSystem(GaussianSplatLoaderSystem)
       .registerSystem(DesktopControlsSystem)
       .registerSystem(MultiplayerSystem);
+
+    mountLoadSplatHud(world);
 
     // ------------------------------------------------------------
     // Gaussian Splat
@@ -93,27 +91,6 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     // Hologram Sphere (distance-grabbable, translate in place)
     // ------------------------------------------------------------
     // spawnHologramSphere(world);
-
-
-    // ------------------------------------------------------------
-    // Panel UI (top-right on desktop, world-space in XR)
-    // ------------------------------------------------------------
-    const panelEntity = world
-      .createTransformEntity()
-      .addComponent(PanelUI, {
-        config: "./ui/sensai.json",
-        maxHeight: 0.45,
-        maxWidth: 0.35,
-      })
-      .addComponent(Interactable)
-      .addComponent(ScreenSpace, {
-        top: "12px",
-        right: "12px",
-        width: "220px",
-        height: "auto",
-        zOffset: 0.25,
-      });
-    panelEntity.object3D!.position.set(0, 1.29, -1.9);
 
   })
   .catch((err) => {

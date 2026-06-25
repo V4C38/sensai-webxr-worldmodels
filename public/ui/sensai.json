@@ -59,7 +59,7 @@
         "sourceTag": "button",
         "type": "custom",
         "children": [
-          "Enter XR"
+          "Enter VR"
         ],
         "properties": {
           "id": "xr-button"
