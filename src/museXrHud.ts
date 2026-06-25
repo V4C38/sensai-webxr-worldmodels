@@ -4,10 +4,10 @@ const MUSEXR_DEMO_URL =
 
 /** Shared HUD chrome (room / chat panels). */
 const PANEL_WIDTH = "300px";
-const PANEL_MAX_HEIGHT = "40vh";
+const PANEL_MAX_HEIGHT = "60vh";
 
 /**
- * Bottom-right MuseXR museum guide (Louvre demo) in a DOM panel sized like chat HUD.
+ * Bottom-left MuseXR museum guide (Louvre demo), 1.5× the default chat-style height.
  */
 export function mountMuseXrHud(): void {
   if (typeof document === "undefined") return;
@@ -17,7 +17,7 @@ export function mountMuseXrHud(): void {
   Object.assign(root.style, {
     position: "fixed",
     bottom: "12px",
-    right: "12px",
+    left: "12px",
     width: PANEL_WIDTH,
     maxHeight: PANEL_MAX_HEIGHT,
     display: "flex",
@@ -47,7 +47,7 @@ export function mountMuseXrHud(): void {
   Object.assign(frameWrap.style, {
     flex: "1 1 auto",
     minHeight: "0",
-    height: "min(320px, 36vh)",
+    height: "min(480px, 54vh)",
     borderRadius: "8px",
     overflow: "hidden",
     border: "1px solid rgba(255,255,255,0.12)",

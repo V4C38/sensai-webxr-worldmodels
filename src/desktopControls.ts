@@ -26,7 +26,9 @@ function isTypingInForm(): boolean {
 
 function isHudElement(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
-  return !!target.closest("#room-hud, #chat-hud, #musexr-hud, .desktop-controls-hint");
+  return !!target.closest(
+    "#room-hud, #chat-hud, #musexr-hud, #load-splat-hud, .desktop-controls-hint",
+  );
 }
 
 /**

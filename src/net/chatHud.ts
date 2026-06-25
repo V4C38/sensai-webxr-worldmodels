@@ -40,7 +40,7 @@ export function mountChatHud(session: RoomSession): ChatHudHandle {
   Object.assign(panel.style, {
     position: "fixed",
     bottom: "12px",
-    left: "12px",
+    right: "12px",
     width: "300px",
     maxHeight: "40vh",
     display: "flex",
