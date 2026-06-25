@@ -44,7 +44,8 @@ export default defineConfig({
     mkcert(),
     injectIWER({
       device: "metaQuest3",
-      activation: "localhost",
+      // IWER only injects when activation matches — include LAN dev URLs for multiplayer testing.
+      activation: /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?\/?$/i,
       verbose: true,
     }),
     compileUIKit({ sourceDir: "ui", outputDir: "public/ui", verbose: true }),

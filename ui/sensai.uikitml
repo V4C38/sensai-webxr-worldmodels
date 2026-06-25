@@ -1,62 +1,75 @@
 <style>
   .panel-container {
     align-items: center;
-    padding: 3;
-    width: 50;
+    padding: 2;
+    width: 28;
     display: flex;
     flex-direction: column;
     background-color: #0d0221;
     border-color: #7b2ff2;
-    border-width: 0.2;
-    border-radius: 2;
+    border-width: 0.15;
+    border-radius: 1.2;
   }
 
   .logo {
-    width: 45;
-    height: 12;
+    width: 24;
+    height: 7;
     object-fit: contain;
   }
 
   .sub-heading {
-    font-size: 1.8;
+    font-size: 1.2;
     color: #c4b5fd;
     text-align: center;
-    margin-top: 0.5;
+    margin-top: 0.3;
   }
 
   .divider {
     width: 80%;
-    height: 0.1;
-    margin-top: 1.5;
-    margin-bottom: 1.5;
+    height: 0.08;
+    margin-top: 0.8;
+    margin-bottom: 0.8;
     background-color: #7b2ff2;
   }
 
   .event-line {
-    font-size: 1.6;
+    font-size: 2;
     color: #fbbf24;
     text-align: center;
     font-weight: medium;
   }
 
+  #load-splat-button,
   #xr-button {
     width: 100%;
-    padding: 1.5;
-    margin-top: 2;
-    background-color: #fbbf24;
-    color: #0d0221;
-    border-radius: 1.5;
+    padding: 0.8;
+    margin-top: 0.8;
+    border-radius: 0.8;
     border-width: 0;
-    font-size: 2.5;
+    font-size: 1.4;
     font-weight: bold;
     text-align: center;
     cursor: pointer;
   }
+
+  #load-splat-button {
+    font-size: 2;
+    font-weight: bold;
+    text-align: center;
+    background-color: #7b2ff2;
+    color: #f5f3ff;
+  }
+
+  #xr-button {
+    background-color: #fbbf24;
+    color: #0d0221;
+  }
 </style>
 <div class="panel-container">
-  <img src="/SensAI-logo.png" alt="SensAI" class="logo" />
-  <span class="sub-heading">WebXR + SparkJS Template</span>
+  <img src="/logo.png" alt="Logo" class="logo" />
+  <span class="sub-heading">WebXR with IWSDK</span>
   <div class="divider"></div>
-  <span class="event-line">sensaihack.com</span>
+  <span class="event-line">Hyped+Escape</span>
+  <button id="load-splat-button">Load Splat</button>
   <button id="xr-button">Enter XR</button>
 </div>

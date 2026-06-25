@@ -2,20 +2,21 @@
 import * as THREE from "three";
 import {
   EnvironmentType,
-  Interactable,
   LocomotionEnvironment,
   Mesh,
   MeshBasicMaterial,
-  PanelUI,
   PlaneGeometry,
-  ScreenSpace,
   SessionMode,
   VisibilityState,
   World,
 } from "@iwsdk/core";
-import { PanelSystem } from "./uiPanel.js";
+import { DesktopControlsSystem } from "./desktopControls.js";
 import { GaussianSplatLoader, GaussianSplatLoaderSystem,} from "./gaussianSplatLoader.js";
-import { spawnHologramSphere } from "./interactableExample.js";
+import { mountLoadSplatHud } from "./loadSplatHud.js";
+import { mountRoomHud, MultiplayerSystem } from "./multiplayerSystem.js";
+import { mountMuseXrHud } from "./museXrHud.js";
+mountRoomHud();
+mountMuseXrHud();
 
 
 // ------------------------------------------------------------
@@ -25,8 +26,10 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   assets: {},
   xr: {
     sessionMode: SessionMode.ImmersiveVR,
-    offer: "always",
-    features: { handTracking: true, layers: true },
+    // Avoid auto-offer; Enter XR uses enterXR() with runtime fallbacks.
+    offer: "none",
+    // layers / hand-tracking break some desktop + Virtual Desktop runtimes.
+    features: { handTracking: false, layers: false },
   },
   render: {
     defaultLighting: false,
@@ -40,13 +43,15 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
 })
   .then((world) => {
     world.camera.position.set(0, 1.5, 0);
-    world.scene.background = new THREE.Color(0x000000);
+    world.scene.background = new THREE.Color(0xBAABAB);
     world.scene.add(new THREE.AmbientLight(0xffffff, 1.0));
 
     world
-      .registerSystem(PanelSystem)
-      .registerSystem(GaussianSplatLoaderSystem);
+      .registerSystem(GaussianSplatLoaderSystem)
+      .registerSystem(DesktopControlsSystem)
+      .registerSystem(MultiplayerSystem);
 
+    mountLoadSplatHud(world);
 
     // ------------------------------------------------------------
     // Gaussian Splat
@@ -55,6 +60,7 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     splatEntity.addComponent(GaussianSplatLoader);
 
     const splatSystem = world.getSystem(GaussianSplatLoaderSystem)!;
+    splatSystem.setHostEntity(splatEntity);
 
     // Play splat animation when entering XR
     world.visibilityState.subscribe((state) => {
@@ -73,42 +79,18 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     floorGeometry.rotateX(-Math.PI / 2);
     const floor = new Mesh(floorGeometry, new MeshBasicMaterial());
     floor.visible = false;
-    world
-      .createTransformEntity(floor)
-      .addComponent(LocomotionEnvironment, { type: EnvironmentType.STATIC });
-
-    const grid = new THREE.GridHelper(100, 100, 0x444444, 0x222222);
-    grid.material.transparent = true;
-    grid.material.opacity = 0.4;
-    world.scene.add(grid);
-
+    const floorEntity = world.createTransformEntity(floor);
+    // Locomotion system can initialize a tick later on startup.
+    requestAnimationFrame(() => {
+      floorEntity.addComponent(LocomotionEnvironment, {
+        type: EnvironmentType.STATIC,
+      });
+    });
 
     // ------------------------------------------------------------
     // Hologram Sphere (distance-grabbable, translate in place)
     // ------------------------------------------------------------
-    spawnHologramSphere(world);
-
-
-    // ------------------------------------------------------------
-    // Panel UI (centered on screen in desktop, positioned in 3D for XR)
-    // ------------------------------------------------------------
-    const panelEntity = world
-      .createTransformEntity()
-      .addComponent(PanelUI, {
-        config: "./ui/sensai.json",
-        maxHeight: 0.8,
-        maxWidth: 1.6,
-      })
-      .addComponent(Interactable)
-      .addComponent(ScreenSpace, {
-        top: "30%",
-        bottom: "30%",
-        left: "30%",
-        right: "30%",
-        height: "40%",
-        width: "40%",
-      });
-    panelEntity.object3D!.position.set(0, 1.29, -1.9);
+    // spawnHologramSphere(world);
 
   })
   .catch((err) => {

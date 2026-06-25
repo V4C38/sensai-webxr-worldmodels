@@ -1,21 +1,44 @@
 
 import { Types, createComponent, createSystem, Entity } from "@iwsdk/core";
-import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
+import { SparkRenderer, SplatMesh, SplatFileType } from "@sparkjsdev/spark";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { GaussianSplatAnimator } from "./gaussianSplatAnimator.js";
+import { bytesToBase64 } from "./net/bytes.js";
+import type { SplatSyncState } from "./net/roomSession.js";
 
 
 // ------------------------------------------------------------
 // Constants & Types
 // ------------------------------------------------------------
-const LOAD_TIMEOUT_MS = 30_000;
+const LOAD_TIMEOUT_MS = 120_000;
+
+/** Correct World Labs / OpenGL SPZ exports (-Y down, -Z forward) for Three.js (+Y up). */
+const SPZ_COORDINATE_FIX_X = Math.PI;
+
+type SplatMeshLoadOptions = NonNullable<
+  ConstructorParameters<typeof SplatMesh>[0]
+>;
 
 interface SplatInstance {
   splat: SplatMesh;
   collider: THREE.Group | null;
   animator: GaussianSplatAnimator | null;
 }
+
+export type SplatLoadedInfo =
+  | { kind: "url"; splatUrl: string; label: string }
+  | {
+      kind: "file";
+      fileName: string;
+      fileType: SplatFileType;
+      fileBytes: ArrayBuffer;
+    };
+
+export type SplatLoadedHandler = (
+  info: SplatLoadedInfo,
+  options: { sync: boolean },
+) => void | Promise<void>;
 
 type SplatHostObject3D = THREE.Object3D & {
   __gaussianSplatTransformPatched?: boolean;
@@ -37,6 +60,24 @@ function patchHostTransformSync(object3D: THREE.Object3D): void {
   host.__gaussianSplatTransformPatched = true;
 }
 
+function splatFileTypeFromName(fileName: string): SplatFileType {
+  const ext = fileName.split(".").pop()?.toLowerCase();
+  switch (ext) {
+    case "spz":
+      return SplatFileType.SPZ;
+    case "ply":
+      return SplatFileType.PLY;
+    case "ksplat":
+      return SplatFileType.KSPLAT;
+    case "rad":
+      return SplatFileType.RAD;
+    default:
+      throw new Error(
+        `[GaussianSplatLoader] Unsupported splat file "${fileName}". Use .spz, .ply, .ksplat, or .rad.`,
+      );
+  }
+}
+
 
 // ------------------------------------------------------------
 // Component – marks an entity as a Gaussian Splat host
@@ -47,7 +88,7 @@ function patchHostTransformSync(object3D: THREE.Object3D): void {
  * children so they inherit the entity's transform.
  */
 export const GaussianSplatLoader = createComponent("GaussianSplatLoader", {
-  splatUrl: { type: Types.String, default: "./splats/sensai.spz" },
+  splatUrl: { type: Types.String, default: "./splats/siesta.spz" },
   meshUrl: { type: Types.String, default: "" },
   autoLoad: { type: Types.Boolean, default: true },
   animate: { type: Types.Boolean, default: false },
@@ -75,6 +116,65 @@ export class GaussianSplatLoaderSystem extends createSystem({
   private animating = new Set<number>();
   private gltfLoader = new GLTFLoader();
   private sparkRenderer: SparkRenderer | null = null;
+  private hostEntity: Entity | null = null;
+  private onSplatLoaded: SplatLoadedHandler | null = null;
+  private syncedState: SplatSyncState | null = null;
+  /** Bumped on each load to cancel in-flight loads that would otherwise stack splats. */
+  private loadEpoch = 0;
+
+  /** Entity used by UI actions such as "Load Splat". */
+  setHostEntity(entity: Entity): void {
+    this.hostEntity = entity;
+  }
+
+  getHostEntity(): Entity | null {
+    return this.hostEntity;
+  }
+
+  hasHostSplat(): boolean {
+    return this.hostEntity !== null && this.instances.has(this.hostEntity.index);
+  }
+
+  /** Cancel in-flight loads so a superseded transfer cannot add another splat. */
+  bumpLoadEpoch(): void {
+    this.loadEpoch += 1;
+  }
+
+  /** Unload every splat on the host entity, including orphaned meshes. */
+  async unloadHostSplat(): Promise<void> {
+    if (!this.hostEntity) return;
+    this.bumpLoadEpoch();
+    await this.clearHostSplats(this.hostEntity);
+  }
+
+  /** Remove tracked and untracked SplatMesh children from an entity. */
+  async clearHostSplats(entity: Entity): Promise<void> {
+    const parent = entity.object3D;
+    if (!parent) return;
+
+    if (this.instances.has(entity.index)) {
+      await this.unload(entity, { animate: false });
+    }
+
+    const orphans: SplatMesh[] = [];
+    for (const child of parent.children) {
+      if (child instanceof SplatMesh) {
+        orphans.push(child);
+      }
+    }
+    for (const splat of orphans) {
+      parent.remove(splat);
+      splat.dispose();
+    }
+  }
+
+  setOnSplatLoaded(handler: SplatLoadedHandler | null): void {
+    this.onSplatLoaded = handler;
+  }
+
+  getSyncedState(): SplatSyncState | null {
+    return this.syncedState;
+  }
 
 
   // ----------------------------------------------------------
@@ -118,7 +218,9 @@ export class GaussianSplatLoaderSystem extends createSystem({
       ) as boolean;
       if (!autoLoad) return;
 
-      this.load(entity).catch((err) => {
+      // Auto-loaded splats should also synchronize into the room so guests
+      // see the current world model as soon as they join.
+      this.load(entity, { sync: true }).catch((err) => {
         console.error(
           `[GaussianSplatLoader] Auto-load failed for entity ${entity.index}:`,
           err,
@@ -153,19 +255,135 @@ export class GaussianSplatLoaderSystem extends createSystem({
   // ----------------------------------------------------------
   async load(
     entity: Entity,
-    options?: { animate?: boolean },
+    options?: { animate?: boolean; sync?: boolean },
   ): Promise<void> {
     const splatUrl = entity.getValue(GaussianSplatLoader, "splatUrl") as string;
-    const meshUrl = entity.getValue(GaussianSplatLoader, "meshUrl") as string;
-    const animate =
-      options?.animate ??
-      (entity.getValue(GaussianSplatLoader, "animate") as boolean);
-
     if (!splatUrl) {
       throw new Error(
         `[GaussianSplatLoader] Entity ${entity.index} has an empty splatUrl.`,
       );
     }
+
+    await this.loadSplatMesh(entity, {
+      sourceLabel: splatUrl,
+      splatMeshOptions: { url: splatUrl },
+      meshUrl: entity.getValue(GaussianSplatLoader, "meshUrl") as string,
+      animate: options?.animate,
+      sync: options?.sync ?? false,
+    });
+  }
+
+  /** Load a splat from a user-selected local file (replaces any current splat). */
+  async loadFromFile(
+    file: File,
+    options?: { animate?: boolean; entity?: Entity; sync?: boolean },
+  ): Promise<void> {
+    const entity = options?.entity ?? this.hostEntity;
+    if (!entity) {
+      throw new Error(
+        "[GaussianSplatLoader] No host entity registered for file loading.",
+      );
+    }
+
+    const fileBytes = await file.arrayBuffer();
+    await this.loadSplatMesh(entity, {
+      sourceLabel: file.name,
+      splatMeshOptions: {
+        fileBytes,
+        fileName: file.name,
+        fileType: splatFileTypeFromName(file.name),
+      },
+      meshUrl: "",
+      animate: options?.animate ?? true,
+      sync: options?.sync ?? true,
+      loadedInfo: {
+        kind: "file",
+        fileName: file.name,
+        fileType: splatFileTypeFromName(file.name),
+        fileBytes,
+      },
+    });
+  }
+
+  /** Load a splat received from another peer in the shared room. */
+  async loadFromNetwork(
+    payload:
+      | { kind: "url"; splatUrl: string; label: string }
+      | {
+          kind: "file";
+          fileName: string;
+          fileType: SplatFileType;
+          fileBytes: ArrayBuffer;
+        },
+    options?: { animate?: boolean },
+  ): Promise<void> {
+    const entity = this.hostEntity;
+    if (!entity) {
+      throw new Error(
+        "[GaussianSplatLoader] No host entity registered for network loading.",
+      );
+    }
+
+    if (payload.kind === "url") {
+      await this.loadSplatMesh(entity, {
+        sourceLabel: payload.label,
+        splatMeshOptions: { url: payload.splatUrl },
+        meshUrl: "",
+        animate: options?.animate ?? true,
+        sync: false,
+        fromNetwork: true,
+        loadedInfo: {
+          kind: "url",
+          splatUrl: payload.splatUrl,
+          label: payload.label,
+        },
+      });
+      return;
+    }
+
+    await this.loadSplatMesh(entity, {
+      sourceLabel: payload.fileName,
+      splatMeshOptions: {
+        fileBytes: payload.fileBytes,
+        fileName: payload.fileName,
+        fileType: payload.fileType,
+      },
+      meshUrl: "",
+      animate: options?.animate ?? true,
+      sync: false,
+      fromNetwork: true,
+      loadedInfo: {
+        kind: "file",
+        fileName: payload.fileName,
+        fileType: payload.fileType,
+        fileBytes: payload.fileBytes,
+      },
+    });
+  }
+
+  private async loadSplatMesh(
+    entity: Entity,
+    {
+      sourceLabel,
+      splatMeshOptions,
+      meshUrl,
+      animate: animateOverride,
+      sync = false,
+      fromNetwork = false,
+      loadedInfo,
+    }: {
+      sourceLabel: string;
+      splatMeshOptions: SplatMeshLoadOptions;
+      meshUrl: string;
+      animate?: boolean;
+      sync?: boolean;
+      fromNetwork?: boolean;
+      loadedInfo?: SplatLoadedInfo;
+    },
+  ): Promise<void> {
+    const animate =
+      animateOverride ??
+      (entity.getValue(GaussianSplatLoader, "animate") as boolean);
 
     const parent = entity.object3D;
     if (!parent) {
@@ -174,9 +392,8 @@ export class GaussianSplatLoaderSystem extends createSystem({
       );
     }
 
-    if (this.instances.has(entity.index)) {
-      await this.unload(entity, { animate: false });
-    }
+    const epoch = ++this.loadEpoch;
+    await this.clearHostSplats(entity);
 
     const enableLod = entity.getValue(
       GaussianSplatLoader,
@@ -192,7 +409,7 @@ export class GaussianSplatLoaderSystem extends createSystem({
     }
 
     const splat = new SplatMesh({
-      url: splatUrl,
+      ...splatMeshOptions,
       lod: enableLod || undefined,
     });
     const timeout = new Promise<never>((_, reject) => {
@@ -200,13 +417,18 @@ export class GaussianSplatLoaderSystem extends createSystem({
         () =>
           reject(
             new Error(
-              `[GaussianSplatLoader] Timed out loading "${splatUrl}" after ${LOAD_TIMEOUT_MS / 1000}s`,
+              `[GaussianSplatLoader] Timed out loading "${sourceLabel}" after ${LOAD_TIMEOUT_MS / 1000}s`,
             ),
           ),
         LOAD_TIMEOUT_MS,
       );
     });
     await Promise.race([splat.initialized, timeout]);
+
+    if (epoch !== this.loadEpoch) {
+      splat.dispose();
+      return;
+    }
 
     let collider: THREE.Group | null = null;
     if (meshUrl) {
@@ -223,18 +445,69 @@ export class GaussianSplatLoaderSystem extends createSystem({
 
     // Render splats behind UI panels (which use AlwaysDepth + high renderOrder)
     splat.renderOrder = -10;
+    splat.rotation.x = SPZ_COORDINATE_FIX_X;
+    if (collider) collider.rotation.x = SPZ_COORDINATE_FIX_X;
+
+    if (epoch !== this.loadEpoch) {
+      splat.dispose();
+      if (collider) {
+        collider.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            mesh.geometry.dispose();
+            const materials = Array.isArray(mesh.material)
+              ? mesh.material
+              : [mesh.material];
+            for (const mat of materials) mat.dispose();
+          }
+        });
+      }
+      return;
+    }
+
     parent.add(splat);
     if (collider) parent.add(collider);
 
     this.instances.set(entity.index, { splat, collider, animator });
     console.log(
-      `[GaussianSplatLoader] Loaded splat for entity ${entity.index}` +
+      `[GaussianSplatLoader] Loaded "${sourceLabel}" for entity ${entity.index}` +
         `${collider ? " (with collider)" : ""}`,
     );
 
     if (animate) {
       this.animating.add(entity.index);
       await animator.animateIn();
+    }
+
+    const info: SplatLoadedInfo =
+      loadedInfo ??
+      (splatMeshOptions.url
+        ? {
+            kind: "url",
+            splatUrl: String(splatMeshOptions.url),
+            label: sourceLabel,
+          }
+        : {
+            kind: "file",
+            fileName: String(splatMeshOptions.fileName ?? sourceLabel),
+            fileType:
+              splatMeshOptions.fileType ??
+              splatFileTypeFromName(String(splatMeshOptions.fileName ?? "")),
+            fileBytes: (splatMeshOptions.fileBytes as ArrayBuffer) ?? new ArrayBuffer(0),
+          });
+
+    this.syncedState =
+      info.kind === "url"
+        ? { kind: "url", splatUrl: info.splatUrl, label: info.label }
+        : {
+            kind: "file",
+            fileName: info.fileName,
+            fileType: info.fileType,
+            base64: bytesToBase64(new Uint8Array(info.fileBytes)),
+          };
+
+    if (!fromNetwork && this.onSplatLoaded) {
+      await this.onSplatLoaded(info, { sync });
     }
   }
 

@@ -9,6 +9,15 @@ import {
   UIKit,
 } from "@iwsdk/core";
 import * as THREE from "three";
+import { GaussianSplatLoaderSystem } from "./gaussianSplatLoader.js";
+import {
+  registerLoadSplatButton,
+  setLoadSplatButtonLoading,
+} from "./splatLoadUi.js";
+import { registerDesktopUiPanel } from "./desktopControls.js";
+import { enterXR } from "./xrSession.js";
+
+const SPLAT_FILE_ACCEPT = ".spz,.ply,.ksplat,.rad";
 
 // Render UI on top of splats using AlwaysDepth + high renderOrder.
 // depthWrite stays true so the IWSDK laser pointer depth-tests correctly
@@ -82,6 +91,7 @@ export function makeEntityRenderOnTop(entity: Entity): void {
   const tryApply = () => {
     if (entity.object3D) {
       applyRenderOrderToObject(entity.object3D);
+      registerDesktopUiPanel(entity.object3D);
       return;
     }
     if (++attempts < 10) {
@@ -108,15 +118,17 @@ export class PanelSystem extends createSystem({
     this.queries.sensaiPanel.subscribe("qualify", (entity) => {
       makeEntityRenderOnTop(entity);
 
-      const document = PanelDocument.data.document[
+      const panelDoc = PanelDocument.data.document[
         entity.index
       ] as UIKitDocument;
-      if (!document) return;
+      if (!panelDoc) return;
 
-      const xrButton = document.getElementById("xr-button") as UIKit.Text;
+      const xrButton = panelDoc.getElementById("xr-button") as UIKit.Text;
       xrButton.addEventListener("click", () => {
         if (this.world.visibilityState.value === VisibilityState.NonImmersive) {
-          this.world.launchXR();
+          enterXR(this.world).catch((err) => {
+            console.error("[Panel] Failed to enter XR:", err);
+          });
         } else {
           this.world.exitXR();
         }
@@ -126,9 +138,41 @@ export class PanelSystem extends createSystem({
         xrButton.setProperties({
           text:
             visibilityState === VisibilityState.NonImmersive
-              ? "Enter XR"
+              ? "Enter VR"
               : "Exit to Browser",
         });
+      });
+
+      const loadSplatButton = panelDoc.getElementById(
+        "load-splat-button",
+      ) as UIKit.Text;
+      registerLoadSplatButton(loadSplatButton);
+
+      loadSplatButton.addEventListener("click", () => {
+        const input = window.document.createElement("input");
+        input.type = "file";
+        input.accept = SPLAT_FILE_ACCEPT;
+        input.addEventListener("change", async () => {
+          const file = input.files?.[0];
+          if (!file) return;
+
+          const splatSystem = this.world.getSystem(GaussianSplatLoaderSystem);
+          if (!splatSystem) {
+            console.error("[Panel] GaussianSplatLoaderSystem is not registered.");
+            return;
+          }
+
+          setLoadSplatButtonLoading(true);
+          try {
+            await splatSystem.unloadHostSplat();
+            await splatSystem.loadFromFile(file);
+          } catch (err) {
+            console.error("[Panel] Failed to load splat file:", err);
+          } finally {
+            setLoadSplatButtonLoading(false);
+          }
+        });
+        input.click();
       });
     }, true);
   }

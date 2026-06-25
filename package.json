@@ -5,13 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "relay": "node server/relay.js",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@iwsdk/core": "0.2.2",
     "@sparkjsdev/spark": "github:sparkjsdev/spark#v2.0.0-preview",
-    "three": "npm:super-three@0.181.0"
+    "three": "npm:super-three@0.181.0",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@iwsdk/vite-plugin-gltf-optimizer": "0.2.2",
