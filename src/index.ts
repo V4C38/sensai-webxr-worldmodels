@@ -15,6 +15,7 @@ import { GaussianSplatLoader, GaussianSplatLoaderSystem,} from "./gaussianSplatL
 import { mountLoadSplatHud } from "./loadSplatHud.js";
 import { mountRoomHud, MultiplayerSystem } from "./multiplayerSystem.js";
 import { mountMuseXrHud } from "./museXrHud.js";
+import { applyEquirectSkybox } from "./skybox.js";
 mountRoomHud();
 mountMuseXrHud();
 
@@ -43,7 +44,7 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
 })
   .then((world) => {
     world.camera.position.set(0, 1.5, 0);
-    world.scene.background = new THREE.Color(0xBAABAB);
+    applyEquirectSkybox(world.scene);
     world.scene.add(new THREE.AmbientLight(0xffffff, 1.0));
 
     world
