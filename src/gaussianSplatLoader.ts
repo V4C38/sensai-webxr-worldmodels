@@ -88,7 +88,7 @@ function splatFileTypeFromName(fileName: string): SplatFileType {
  * children so they inherit the entity's transform.
  */
 export const GaussianSplatLoader = createComponent("GaussianSplatLoader", {
-  splatUrl: { type: Types.String, default: "./splats/siesta.spz" },
+  splatUrl: { type: Types.String, default: "./splats/AirLO3c.ply" },
   meshUrl: { type: Types.String, default: "" },
   autoLoad: { type: Types.Boolean, default: true },
   animate: { type: Types.Boolean, default: false },
