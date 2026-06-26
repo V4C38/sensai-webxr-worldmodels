@@ -7,7 +7,17 @@ import {
   RpcHandler,
   WebSocketTransport,
 } from "./transport.js";
-import { VOICE_SIGNAL_TOPIC, type VoiceSignalPayload } from "./types.js";
+import {
+  SKYBOX_TOPIC,
+  VOICE_SIGNAL_TOPIC,
+  type SkyboxFileChunkPayload,
+  type SkyboxFileEndPayload,
+  type SkyboxFileStartPayload,
+  type SkyboxSyncPayload,
+  type SkyboxSyncState,
+  type SkyboxUrlPayload,
+  type VoiceSignalPayload,
+} from "./types.js";
 import { VoiceChat } from "./voiceChat.js";
 
 export interface SplatUrlPayload {
@@ -69,9 +79,14 @@ export class RoomSession {
   private _peerCount = 1;
   private _remotePeers = new Set<string>();
   private _currentState: SplatSyncState | null = null;
+  private _currentSkyboxState: SkyboxSyncState | null = null;
   private _incomingFiles = new Map<
     string,
     { fileName: string; fileType: SplatFileType; chunks: string[]; total: number }
+  >();
+  private _incomingSkyboxFiles = new Map<
+    string,
+    { fileName: string; chunks: string[]; total: number }
   >();
   private _loadBeginHandlers = new Set<() => void | Promise<void>>();
   private _loadEndHandlers = new Set<() => void | Promise<void>>();
@@ -106,6 +121,9 @@ export class RoomSession {
       if (this._currentState) {
         this.syncCurrentStateToPeer(peerId);
       }
+      if (this._currentSkyboxState) {
+        this.syncSkyboxToPeer(peerId);
+      }
     });
 
     transport.onPeerLeave((peerId) => {
@@ -139,6 +157,14 @@ export class RoomSession {
 
   rememberState(state: SplatSyncState): void {
     this._currentState = state;
+  }
+
+  rememberSkyboxState(state: SkyboxSyncState): void {
+    this._currentSkyboxState = state;
+  }
+
+  get currentSkyboxState(): SkyboxSyncState | null {
+    return this._currentSkyboxState;
   }
 
   on(topic: string, handler: RpcHandler): () => void {
@@ -246,6 +272,122 @@ export class RoomSession {
   onSplatLoadEnd(handler: () => void | Promise<void>): () => void {
     this._loadEndHandlers.add(handler);
     return () => this._loadEndHandlers.delete(handler);
+  }
+
+  /** Register handlers that reassemble chunked skybox JPEG payloads. */
+  onSkyboxLoad(handler: (state: SkyboxSyncState) => void | Promise<void>): () => void {
+    return this.on(SKYBOX_TOPIC, (payload) => {
+      void this._handleSkyboxLoad(payload as SkyboxSyncPayload, handler);
+    });
+  }
+
+  broadcastSkyboxUrl(skyboxUrl: string): void {
+    const state: SkyboxSyncState = { kind: "url", skyboxUrl };
+    this._currentSkyboxState = state;
+    this.emit(SKYBOX_TOPIC, { kind: "url", skyboxUrl } satisfies SkyboxUrlPayload);
+  }
+
+  async broadcastSkyboxFile(fileName: string, fileBytes: ArrayBuffer): Promise<void> {
+    const base64 = bytesToBase64(new Uint8Array(fileBytes));
+    const state: SkyboxSyncState = { kind: "file", fileName, base64 };
+    this._currentSkyboxState = state;
+    this.emitSkyboxFileChunks(undefined, fileName, base64);
+  }
+
+  syncSkyboxToPeer(peerId: string): void {
+    const state = this._currentSkyboxState;
+    if (!state) return;
+
+    if (state.kind === "url") {
+      this.emitTo(peerId, SKYBOX_TOPIC, {
+        kind: "url",
+        skyboxUrl: state.skyboxUrl,
+      } satisfies SkyboxUrlPayload);
+      return;
+    }
+
+    this.emitSkyboxFileChunks(peerId, state.fileName, state.base64);
+  }
+
+  private emitSkyboxFileChunks(
+    targetPeerId: string | undefined,
+    fileName: string,
+    base64: string,
+  ): void {
+    const chunks = chunkBase64(base64);
+    const transferId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const send = targetPeerId
+      ? (payload: SkyboxSyncPayload) => this.emitTo(targetPeerId, SKYBOX_TOPIC, payload)
+      : (payload: SkyboxSyncPayload) => this.emit(SKYBOX_TOPIC, payload);
+
+    send({
+      kind: "file-start",
+      transferId,
+      fileName,
+      totalChunks: chunks.length,
+    } satisfies SkyboxFileStartPayload);
+
+    for (let i = 0; i < chunks.length; i++) {
+      send({
+        kind: "file-chunk",
+        transferId,
+        chunkIndex: i,
+        data: chunks[i]!,
+      } satisfies SkyboxFileChunkPayload);
+    }
+
+    send({
+      kind: "file-end",
+      transferId,
+    } satisfies SkyboxFileEndPayload);
+  }
+
+  private async _handleSkyboxLoad(
+    payload: SkyboxSyncPayload,
+    handler: (state: SkyboxSyncState) => void | Promise<void>,
+  ): Promise<void> {
+    if (payload.kind === "url") {
+      const state: SkyboxSyncState = {
+        kind: "url",
+        skyboxUrl: payload.skyboxUrl,
+      };
+      this._currentSkyboxState = state;
+      await handler(state);
+      return;
+    }
+
+    if (payload.kind === "file-start") {
+      this._incomingSkyboxFiles.set(payload.transferId, {
+        fileName: payload.fileName,
+        chunks: [],
+        total: payload.totalChunks,
+      });
+      return;
+    }
+
+    if (payload.kind === "file-chunk") {
+      const incoming = this._incomingSkyboxFiles.get(payload.transferId);
+      if (!incoming) return;
+      incoming.chunks[payload.chunkIndex] = payload.data;
+      return;
+    }
+
+    if (payload.kind === "file-end") {
+      const incoming = this._incomingSkyboxFiles.get(payload.transferId);
+      if (!incoming) return;
+      this._incomingSkyboxFiles.delete(payload.transferId);
+      const received = incoming.chunks.filter((chunk) => chunk !== undefined);
+      if (received.length !== incoming.total) return;
+
+      const base64 = incoming.chunks.join("");
+      const state: SkyboxSyncState = {
+        kind: "file",
+        fileName: incoming.fileName,
+        base64,
+      };
+      this._currentSkyboxState = state;
+      await handler(state);
+    }
   }
 
   /** Register handlers that reassemble chunked file payloads. */

@@ -13,9 +13,9 @@ import {
   RoomSession,
   SplatSyncState,
 } from "./net/roomSession.js";
+import type { SkyboxSyncState } from "./net/types.js";
+import { applyEquirectSkybox, applyEquirectSkyboxFromBytes, setSkyboxSyncHandler, SKYBOX_URL } from "./skybox.js";
 import { mountChatHud } from "./net/chatHud.js";
-import { PeerPresence } from "./peerPresence.js";
-import { setLoadSplatButtonLoading } from "./splatLoadUi.js";
 
 /**
  * Shared-room networking inspired by google/xrblocks netblocks.
@@ -55,6 +55,13 @@ export class MultiplayerSystem extends createSystem({}) {
       this.session.onSplatLoadBegin(() => this.prepareRemoteSplat());
       this.session.onSplatLoadEnd(() => setLoadSplatButtonLoading(false));
       this.session.onSplatLoad((state) => this.applyRemoteSplat(state));
+      this.session.onSkyboxLoad((state) => this.applyRemoteSkybox(state));
+
+      this.session.rememberSkyboxState({ kind: "url", skyboxUrl: SKYBOX_URL });
+
+      setSkyboxSyncHandler(async (file) => {
+        await this.broadcastLocalSkybox(file);
+      });
 
       this.session.onPeerCountChange((count) => {
         const hud = document.getElementById("room-hud-peer-count");
@@ -141,6 +148,25 @@ export class MultiplayerSystem extends createSystem({}) {
       const msg = err instanceof Error ? err.message : String(err);
       chat.appendSystemLine(`Voice error: ${msg}`);
       console.error("[Multiplayer] Voice enable failed:", err);
+    }
+  }
+
+  private async broadcastLocalSkybox(file: File): Promise<void> {
+    if (!this.session) return;
+    const bytes = await file.arrayBuffer();
+    await this.session.broadcastSkyboxFile(file.name, bytes);
+  }
+
+  private async applyRemoteSkybox(state: SkyboxSyncState): Promise<void> {
+    try {
+      if (state.kind === "url") {
+        await applyEquirectSkybox(this.world.scene, state.skyboxUrl);
+      } else {
+        const bytes = base64ToBytes(state.base64);
+        await applyEquirectSkyboxFromBytes(this.world.scene, bytes);
+      }
+    } catch (err) {
+      console.error("[Multiplayer] Failed to apply remote skybox:", err);
     }
   }
 

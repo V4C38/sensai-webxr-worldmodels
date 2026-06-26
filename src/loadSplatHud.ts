@@ -5,6 +5,11 @@ import {
   registerLoadSplatButton,
   setLoadSplatButtonLoading,
 } from "./splatLoadUi.js";
+import {
+  pickAndApplySkybox,
+  registerLoadSkyboxButton,
+  setLoadSkyboxButtonLoading,
+} from "./skybox.js";
 import { enterXR } from "./xrSession.js";
 
 const SPLAT_FILE_ACCEPT = ".spz,.ply,.ksplat,.rad";
@@ -99,6 +104,24 @@ export function mountLoadSplatHud(world: World): void {
     input.click();
   });
 
+  const skyboxBtn = makeHudButton("Load Skybox", "#7ac0ff");
+  skyboxBtn.id = "load-skybox-button";
+  skyboxBtn.style.color = "#0d0221";
+  registerLoadSkyboxButton(skyboxBtn);
+
+  skyboxBtn.addEventListener("click", () => {
+    void (async () => {
+      setLoadSkyboxButtonLoading(true);
+      try {
+        await pickAndApplySkybox(world.scene);
+      } catch (err) {
+        console.error("[LoadSplatHud] Failed to load skybox:", err);
+      } finally {
+        setLoadSkyboxButtonLoading(false);
+      }
+    })();
+  });
+
   const xrBtn = makeHudButton("Enter VR", "#fbbf24");
   xrBtn.style.color = "#0d0221";
   xrBtn.addEventListener("click", () => {
@@ -119,8 +142,10 @@ export function mountLoadSplatHud(world: World): void {
   });
 
   root.appendChild(loadBtn);
+  root.appendChild(skyboxBtn);
   root.appendChild(xrBtn);
   loadBtn.style.width = "100%";
+  skyboxBtn.style.width = "100%";
   xrBtn.style.width = "100%";
   document.body.appendChild(root);
 }
