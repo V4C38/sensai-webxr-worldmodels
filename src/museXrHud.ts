@@ -1,3 +1,5 @@
+import { playSophieWelcome } from "./sophieAudio";
+
 const MUSEXR_DEMO_URL =
   import.meta.env.VITE_MUSEXR_DEMO_URL?.trim() ||
   "https://louvre-xr-backend-production.up.railway.app/demo";
@@ -93,4 +95,7 @@ export function mountMuseXrHud(): void {
   root.appendChild(link);
 
   document.body.appendChild(root);
+
+  // Sophie welcome greeting on room join
+  playSophieWelcome();
 }
